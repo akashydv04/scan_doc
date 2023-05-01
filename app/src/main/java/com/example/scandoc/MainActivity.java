@@ -9,13 +9,14 @@ import androidx.core.content.FileProvider;
 import androidx.databinding.DataBindingUtil;
 
 import android.Manifest;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
-import android.graphics.pdf.PdfDocument;
-import android.media.Image;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -23,11 +24,8 @@ import android.widget.Toast;
 
 import com.example.scandoc.databinding.ActivityMainBinding;
 
-import org.w3c.dom.Document;
-
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
@@ -53,35 +51,32 @@ public class MainActivity extends AppCompatActivity {
             captureImage();
         });
         binding.btnSave.setOnClickListener(v -> {
-            saveAsPdf();
+            saveLocally();
         });
     }
 
-    private void saveAsPdf() {
-        File dir = new File(Environment.getDataDirectory(),"SaveImage");
-        if (!dir.exists()){
-            dir.mkdir();
+    private void saveLocally() {
+        Uri image;
+        ContentResolver contentResolver = getContentResolver();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
+            image = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+        }
+        else {
+            image = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
         }
 
-        BitmapDrawable bitmapDrawable = (BitmapDrawable) binding.imgScanned.getDrawable();
-        Bitmap bitmap = bitmapDrawable.getBitmap();
-        File file = new File(dir, System.currentTimeMillis()+".jpg");
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(MediaStore.Images.Media.DISPLAY_NAME,System.currentTimeMillis()+".jpg");
+        contentValues.put(MediaStore.Images.Media.MIME_TYPE,"image/*");
+        Uri uri = contentResolver.insert(image, contentValues);
         try {
-            outputStream = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+            BitmapDrawable bitmapDrawable = (BitmapDrawable) binding.imgScanned.getDrawable();
+            Bitmap bitmap = bitmapDrawable.getBitmap();
+
+            OutputStream outputStream = contentResolver.openOutputStream(uri);
+            bitmap.compress(Bitmap.CompressFormat.JPEG,100,outputStream);
             Toast.makeText(this, "Saved Successfully", Toast.LENGTH_SHORT).show();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            outputStream.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            outputStream.close();
-        } catch (IOException e) {
+        }catch (Exception e){
             e.printStackTrace();
         }
 
